@@ -5,7 +5,7 @@ add_library(sim-core
 )
 
 target_include_directories(sim-core
-    PUBlIC
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
