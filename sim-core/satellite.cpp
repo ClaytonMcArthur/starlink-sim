@@ -3,7 +3,7 @@
 #include "satellite.h"
 #include <cmath>
 
-Vec3 Satellite::position(double tSeconds) const {
+Vec3 Satellite::positionAt(double tSeconds) const {
     // Simple circular orbit model for now
     double radius = 6371.0 + altitudeKm; // Earth radius + altitude
 

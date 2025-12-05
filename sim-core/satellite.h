@@ -12,7 +12,7 @@ class Satellite {
         double raanDeg{0.0};            // Right Ascension of Ascending Node
         double meanAnomalyDeg{0.0};     // Starting angle in orbit
 
-        Vec3 position(double tSeconds) const;
+        Vec3 positionAt(double tSeconds) const;
 
     private:
         double deg2rad(double d) const { return d * 3.141592653589793 / 180.0; }
