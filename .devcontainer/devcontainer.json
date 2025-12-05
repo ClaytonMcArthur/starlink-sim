@@ -1,0 +1,25 @@
+{
+  "name": "Starlink Sim Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspaces/starlink-sim",
+
+  "settings": {
+    "cmake.generator": "Ninja",
+    "cmake.buildDirectory": "build",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
+  },
+
+  "extensions": [
+    "ms-vscode.cpptools",
+    "ms-vscode.cmake-tools",
+    "twxs.cmake",
+    "ms-vscode.cpptools-extension-pack"
+  ],
+
+  "remoteUser": "vscode",
+
+  "postCreateCommand": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug"
+}

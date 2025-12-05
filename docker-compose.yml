@@ -1,0 +1,8 @@
+version: "3.9"
+
+services:
+  sim:
+    build: .
+    image: starlink-sim:latest
+    container_name: starlink-sim
+    command: ["./build/tools/run_small_sim"]
