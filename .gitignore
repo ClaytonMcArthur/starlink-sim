@@ -1,0 +1,28 @@
+# Build directories
+/build/
+/out/
+/dist/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Dev containers
+.devcontainer/*.log
+
+# macOS junk
+.DS_Store
+
+# Python caches (for analysis scripts)
+__pycache__/
+*.pyc
+
+# Logs
+*.log
