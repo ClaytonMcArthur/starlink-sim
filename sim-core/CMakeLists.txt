@@ -4,8 +4,8 @@ add_library(sim-core
     ground_station.cpp 
 )
 
-target_compile_directories(sim-core
-    PUBlIC
+target_include_directories(sim-core
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
