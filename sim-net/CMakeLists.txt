@@ -2,6 +2,8 @@ add_library(sim-net
     dijkstra_router.cpp
     greedy_geo_router.cpp
     route_utils.cpp
+    packet.cpp
+    link_emulator.cpp
 )
 
 target_include_directories(sim-net
