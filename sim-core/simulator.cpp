@@ -5,7 +5,7 @@
 
 namespace {
     constexpr double kSpeedOfLightKmPerSec = 299792.458;
-    constexpr double kMaxIslDistanceKm = 3000.0; // max ISL distance
+    constexpr double kMaxIslDistanceKm = 20000.0; // max ISL distance
     constexpr double kDefaultCapacityMbps = 1000.0;
     constexpr double kDefaultLossProb = 0.01;
 
