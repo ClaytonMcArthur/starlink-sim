@@ -1,7 +1,11 @@
 add_library(sim-core
     vec3.cpp
     satellite.cpp
-    ground_station.cpp 
+    ground_station.cpp
+    link.cpp
+    topology.cpp
+    simulator.cpp
+    constellation_factory.cpp
 )
 
 target_include_directories(sim-core
