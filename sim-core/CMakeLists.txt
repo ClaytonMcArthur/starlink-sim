@@ -2,6 +2,7 @@ add_library(sim-core
     vec3.cpp
     satellite.cpp
     ground_station.cpp
+    ground_station_catalog.cpp
     link.cpp
     topology.cpp
     simulator.cpp
