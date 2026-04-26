@@ -3,7 +3,9 @@ add_executable(run_small_sim
 )
 
 target_link_libraries(run_small_sim
-    PRIVATE sim-core
+    PRIVATE 
+        sim-core
+        sim-net
 )
 
 target_compile_features(run_small_sim PUBLIC cxx_std_20)

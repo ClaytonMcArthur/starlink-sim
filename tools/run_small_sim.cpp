@@ -1,18 +1,56 @@
-#include <iostream>
 #include <iomanip>
+#include <iostream>
+#include <unordered_map>
+#include <vector>
 
-#include "simulator.h"
-#include "ground_station.h"
 #include "constellation_factory.h"
+#include "dijkstra_router.h"
+#include "ground_station.h"
+#include "simulator.h"
+
+double computeRouteLatency(
+    const std::vector<int>& route,
+    const TopologySnapshot& topo
+) {
+    if (route.size() < 2) {
+        return 0.0;
+    }
+
+    std::unordered_map<int, std::unordered_map<int, double>> latency;
+
+    for (const auto& link : topo.links) {
+        latency[link.fromNodeId][link.toNodeId] = link.latencyMs;
+    }
+
+    double total = 0.0;
+
+    for (std::size_t i = 0; i + 1 < route.size(); ++i) {
+        total += latency[route[i]][route[i + 1]];
+    }
+
+    return total;
+}
+
+void printRoute(const std::vector<int>& route) {
+    for (std::size_t i = 0; i < route.size(); ++i) {
+        std::cout << route[i];
+
+        if (i + 1 < route.size()) {
+            std::cout << " -> ";
+        }
+    }
+
+    std::cout << "\n";
+}
 
 int main() {
     Simulator sim;
 
     auto satellites = makeWalkerConstellation(
-        4,      // orbital planes
-        8,      // satellites per plane
-        550.0,  // altitude km
-        53.0    // inclination degrees
+        4,
+        8,
+        550.0,
+        53.0
     );
 
     for (const auto& sat : satellites) {
@@ -51,23 +89,32 @@ int main() {
     std::cout << "Total links: " << topo.links.size() << "\n";
     std::cout << "Average link latency: " << avgLatencyMs << " ms\n";
 
-    std::cout << "\nFirst few links:\n";
-    for (std::size_t i = 0; i < topo.links.size() && i < 10; ++i) {
-        const auto& link = topo.links[i];
+    const int seattleNodeId = static_cast<int>(satellites.size());
+    const int redmondNodeId = static_cast<int>(satellites.size() + 1);
 
-        std::cout << "  "
-                  << link.fromNodeId
-                  << " -> "
-                  << link.toNodeId
-                  << " | latency="
-                  << link.latencyMs
-                  << " ms"
-                  << " | capacity="
-                  << link.capacityMbps
-                  << " Mbps"
-                  << " | loss="
-                  << link.lossProb
+    DijkstraRouter router;
+    auto route = router.computeRoute(seattleNodeId, redmondNodeId, topo);
+
+    std::cout << "\nDijkstra route from Seattle node "
+              << seattleNodeId
+              << " to Redmond node "
+              << redmondNodeId
+              << ":\n";
+
+    if (route.empty()) {
+        std::cout << "No route found.\n";
+    } else {
+        printRoute(route);
+
+        double routeLatency = computeRouteLatency(route, topo);
+
+        std::cout << "Route hops: "
+                  << route.size() - 1
                   << "\n";
+
+        std::cout << "Route latency: "
+                  << routeLatency
+                  << " ms\n";
     }
 
     return 0;
