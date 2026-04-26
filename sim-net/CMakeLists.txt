@@ -1,5 +1,6 @@
 add_library(sim-net
     dijkstra_router.cpp
+    greedy_geo_router.cpp
     route_utils.cpp
 )
 
