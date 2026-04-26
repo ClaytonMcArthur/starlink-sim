@@ -1,5 +1,6 @@
 add_library(sim-net
     dijkstra_router.cpp
+    route_utils.cpp
 )
 
 target_include_directories(sim-net
