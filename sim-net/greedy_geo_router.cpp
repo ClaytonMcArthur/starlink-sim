@@ -1,18 +1,16 @@
-//sim-net/greedy_geo_router.cpp
-
 #include "greedy_geo_router.h"
 
 #include <cmath>
+#include <limits>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 namespace {
     double distanceKm(const Vec3& a, const Vec3& b) {
-        double dx = a.x - b.x;
-        double dy = a.y - b.y;
-        double dz = a.z - b.z;
+        const double dx = a.x - b.x;
+        const double dy = a.y - b.y;
+        const double dz = a.z - b.z;
         return std::sqrt(dx * dx + dy * dy + dz * dz);
     }
 }
@@ -42,10 +40,10 @@ std::vector<int> GreedyGeoRouter::computeRoute(
     std::unordered_set<int> visited;
 
     int currentNodeId = srcNodeId;
+    const Vec3 destinationPosition = positions[dstNodeId];
+
     route.push_back(currentNodeId);
     visited.insert(currentNodeId);
-
-    const Vec3 destinationPosition = positions[dstNodeId];
 
     const int maxHops = static_cast<int>(topo.nodes.size());
 
@@ -54,22 +52,19 @@ std::vector<int> GreedyGeoRouter::computeRoute(
             return route;
         }
 
-        double currentDistanceToDest = 
-            distanceKm(positions[currentNodeId], destinationPosition);
-
         int bestNeighbor = -1;
-        double bestDistanceToDest = currentDistanceToDest;
+        double bestDistanceToDest = std::numeric_limits<double>::infinity();
 
         for (int neighborId : neighbors[currentNodeId]) {
             if (visited.contains(neighborId)) {
                 continue;
             }
 
-            double canidateDistance = 
+            double candidateDistance =
                 distanceKm(positions[neighborId], destinationPosition);
 
-            if (canidateDistance < bestDistanceToDest) {
-                bestDistanceToDest = canidateDistance;
+            if (candidateDistance < bestDistanceToDest) {
+                bestDistanceToDest = candidateDistance;
                 bestNeighbor = neighborId;
             }
         }
