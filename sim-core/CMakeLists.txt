@@ -5,6 +5,7 @@ add_library(sim-core
     link.cpp
     topology.cpp
     simulator.cpp
+    constellation_factory.cpp
 )
 
 target_include_directories(sim-core
