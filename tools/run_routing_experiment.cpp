@@ -1,85 +1,195 @@
-//tools/run_routing_experiment.cpp
-
 #include <iomanip>
 #include <iostream>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "constellation_factory.h"
 #include "dijkstra_router.h"
-#include "ground_station.h"
+#include "greedy_geo_router.h"
+#include "ground_station_catalog.h"
 #include "route_utils.h"
 #include "simulator.h"
+
+struct RoutePair {
+    std::string srcName;
+    std::string dstName;
+    int srcNodeId{0};
+    int dstNodeId{0};
+};
+
+void printExperimentRow(
+    const std::string& routerName,
+    double timeSeconds,
+    const std::string& srcName,
+    const std::string& dstName,
+    int hops,
+    double latencyMs,
+    bool routeChanged,
+    const std::vector<int>& route
+) {
+    std::cout << routerName << ","
+              << timeSeconds << ","
+              << srcName << ","
+              << dstName << ","
+              << hops << ","
+              << latencyMs << ","
+              << (routeChanged ? "true" : "false") << ","
+              << routeToString(route)
+              << "\n";
+}
 
 int main() {
     Simulator sim;
 
     auto satellites = makeWalkerConstellation(
-        4,
-        8,
-        550.0,
-        53.0
+        6,      // orbital planes
+        10,     // satellites per plane
+        550.0,  // altitude km
+        53.0    // inclination degrees
     );
 
     for (const auto& sat : satellites) {
         sim.addSatellite(sat);
     }
 
-    GroundStation seattle;
-    seattle.id = 1000;
-    seattle.latDeg = 47.6062;
-    seattle.lonDeg = -122.3321;
-    sim.addGroundStation(seattle);
+    auto groundStations = makeDefaultGroundStations();
 
-    GroundStation redmond;
-    redmond.id = 1001;
-    redmond.latDeg = 47.6740;
-    redmond.lonDeg = -122.1215;
-    sim.addGroundStation(redmond);
+    for (const auto& namedStation : groundStations) {
+        sim.addGroundStation(namedStation.station);
+    }
 
-    const int seattleNodeId = static_cast<int>(satellites.size());
-    const int redmondNodeId = static_cast<int>(satellites.size() + 1);
+    const int firstGroundNodeId = static_cast<int>(satellites.size());
 
-    DijkstraRouter router;
+    auto nodeIdForGroundStationIndex = [firstGroundNodeId](int index) {
+        return firstGroundNodeId + index;
+    };
 
-    std::vector<int> previousRoute;
+    std::vector<RoutePair> routePairs = {
+        {
+            "seattle",
+            "redmond",
+            nodeIdForGroundStationIndex(0),
+            nodeIdForGroundStationIndex(1)
+        },
+        {
+            "seattle",
+            "new_york",
+            nodeIdForGroundStationIndex(0),
+            nodeIdForGroundStationIndex(2)
+        },
+        {
+            "seattle",
+            "london",
+            nodeIdForGroundStationIndex(0),
+            nodeIdForGroundStationIndex(3)
+        },
+        {
+            "los_angeles",
+            "tokyo",
+            nodeIdForGroundStationIndex(4),
+            nodeIdForGroundStationIndex(5)
+        },
+        {
+            "redmond",
+            "sydney",
+            nodeIdForGroundStationIndex(1),
+            nodeIdForGroundStationIndex(6)
+        },
+        {
+            "new_york",
+            "paris",
+            nodeIdForGroundStationIndex(2),
+            nodeIdForGroundStationIndex(7)
+        }
+    };
+
+    DijkstraRouter dijkstraRouter;
+    GreedyGeoRouter greedyRouter;
+
+    std::vector<std::vector<int>> previousDijkstraRoutes(routePairs.size());
+    std::vector<std::vector<int>> previousGreedyRoutes(routePairs.size());
 
     std::cout << std::fixed << std::setprecision(3);
 
-    std::cout << "time_s,hops,latency_ms,route_changed,route\n";
+    std::cout << "router,time_s,src,dst,hops,latency_ms,route_changed,route\n";
 
     for (double t = 0.0; t <= 3600.0; t += 60.0) {
         auto topo = sim.snapshotAt(t);
 
-        auto route = router.computeRoute(
-            seattleNodeId,
-            redmondNodeId,
-            topo
-        );
+        for (std::size_t i = 0; i < routePairs.size(); ++i) {
+            const auto& pair = routePairs[i];
 
-        bool routeChanged = false;
+            auto dijkstraRoute = dijkstraRouter.computeRoute(
+                pair.srcNodeId,
+                pair.dstNodeId,
+                topo
+            );
 
-        if (t == 0.0) {
-            routeChanged = false;
-        } else {
-            routeChanged = !routesEqual(route, previousRoute);
+            bool dijkstraChanged = false;
+            if (t != 0.0) {
+                dijkstraChanged = !routesEqual(
+                    dijkstraRoute,
+                    previousDijkstraRoutes[i]
+                );
+            }
+
+            int dijkstraHops = dijkstraRoute.empty()
+                ? -1
+                : static_cast<int>(dijkstraRoute.size()) - 1;
+
+            double dijkstraLatency = dijkstraRoute.empty()
+                ? 0.0
+                : computeRouteLatency(dijkstraRoute, topo);
+
+            printExperimentRow(
+                "dijkstra",
+                t,
+                pair.srcName,
+                pair.dstName,
+                dijkstraHops,
+                dijkstraLatency,
+                dijkstraChanged,
+                dijkstraRoute
+            );
+
+            previousDijkstraRoutes[i] = dijkstraRoute;
+
+            auto greedyRoute = greedyRouter.computeRoute(
+                pair.srcNodeId,
+                pair.dstNodeId,
+                topo
+            );
+
+            bool greedyChanged = false;
+            if (t != 0.0) {
+                greedyChanged = !routesEqual(
+                    greedyRoute,
+                    previousGreedyRoutes[i]
+                );
+            }
+
+            int greedyHops = greedyRoute.empty()
+                ? -1
+                : static_cast<int>(greedyRoute.size()) - 1;
+
+            double greedyLatency = greedyRoute.empty()
+                ? 0.0
+                : computeRouteLatency(greedyRoute, topo);
+
+            printExperimentRow(
+                "greedy",
+                t,
+                pair.srcName,
+                pair.dstName,
+                greedyHops,
+                greedyLatency,
+                greedyChanged,
+                greedyRoute
+            );
+
+            previousGreedyRoutes[i] = greedyRoute;
         }
-
-        int hops = route.empty()
-            ? -1
-            : static_cast<int>(route.size()) - 1;
-
-        double latencyMs = route.empty()
-            ? 0.0
-            : computeRouteLatency(route, topo);
-
-        std::cout << t << ","
-                  << hops << ","
-                  << latencyMs << ","
-                  << (routeChanged ? "true" : "false") << ","
-                  << routeToString(route)
-                  << "\n";
-
-        previousRoute = route;
     }
 
     return 0;

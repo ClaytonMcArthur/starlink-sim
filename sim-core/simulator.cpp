@@ -1,11 +1,18 @@
-//sim-core/simulator.cpp
-
 #include "simulator.h"
+
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace {
     constexpr double kSpeedOfLightKmPerSec = 299792.458;
-    constexpr double kMaxIslDistanceKm = 20000.0; // max ISL distance
+
+    // More realistic than the very dense mesh.
+    constexpr double kMaxIslDistanceKm = 5000.0;
+
+    // Limit each satellite to only its closest satellite neighbors.
+    constexpr int kMaxSatelliteNeighbors = 4;
+
     constexpr double kDefaultCapacityMbps = 1000.0;
     constexpr double kDefaultLossProb = 0.01;
 
@@ -13,22 +20,34 @@ namespace {
         double dx = a.x - b.x;
         double dy = a.y - b.y;
         double dz = a.z - b.z;
-        return std::sqrt(dx*dx + dy*dy + dz*dz);
+
+        return std::sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    double latencyMsFromDistance(double distanceKmValue) {
+        return (distanceKmValue / kSpeedOfLightKmPerSec) * 1000.0;
     }
 
     bool satelliteAboveHorizon(const Vec3& satPos, const Vec3& gsPos) {
-        // Simple check: sat is above horizon if the angle between gs radius
-        // vector and gs->sat vector is < 90 degrees.
         double dot = (satPos.x - gsPos.x) * gsPos.x +
                      (satPos.y - gsPos.y) * gsPos.y +
                      (satPos.z - gsPos.z) * gsPos.z;
+
         return dot > 0.0;
+    }
+
+    Link makeLink(int fromNodeId, int toNodeId, double distanceKmValue) {
+        Link link;
+        link.fromNodeId = fromNodeId;
+        link.toNodeId = toNodeId;
+        link.latencyMs = latencyMsFromDistance(distanceKmValue);
+        link.capacityMbps = kDefaultCapacityMbps;
+        link.lossProb = kDefaultLossProb;
+        return link;
     }
 }
 
 void Simulator::addSatellite(const Satellite& sat) {
-    // In a real system you would assign IDs; for now we keep what user sets.
-    // Later we will enforce unique IDs here.
     satellites_.push_back(sat);
 }
 
@@ -46,61 +65,77 @@ TopologySnapshot Simulator::snapshotAt(double tSeconds) const {
     std::vector<Vec3> gsPositions;
     gsPositions.reserve(groundStation_.size());
 
-    // Assign node IDs: satellites first, then ground stations
     int nextNodeId = 0;
 
-    // Satellites
-    for (const auto& sat: satellites_) {
+    for (const auto& sat : satellites_) {
         Vec3 pos = sat.positionAt(tSeconds);
         satPositions.push_back(pos);
 
-        Node n;
-        n.id = nextNodeId++;
-        n.isSatellite = true;
-        n.position = pos;
-        topo.nodes.push_back(n);
+        Node node;
+        node.id = nextNodeId++;
+        node.isSatellite = true;
+        node.position = pos;
+        topo.nodes.push_back(node);
     }
 
     int firstGroundNodeId = nextNodeId;
 
-    // Ground stations
     for (const auto& gs : groundStation_) {
         Vec3 pos = gs.position();
         gsPositions.push_back(pos);
 
-        Node n;
-        n.id = nextNodeId++;
-        n.isSatellite = false;
-        n.position = pos;
-        topo.nodes.push_back(n);
+        Node node;
+        node.id = nextNodeId++;
+        node.isSatellite = false;
+        node.position = pos;
+        topo.nodes.push_back(node);
     }
 
-    // Inter-satellite links
+    // Inter-satellite links:
+    // For each satellite, find nearby satellites and keep only the closest K.
     for (std::size_t i = 0; i < satPositions.size(); ++i) {
-        for (std::size_t j = i + 1; j < satPositions.size(); ++j) {
+        std::vector<std::pair<double, int>> candidates;
+
+        for (std::size_t j = 0; j < satPositions.size(); ++j) {
+            if (i == j) {
+                continue;
+            }
+
             double dKm = distanceKm(satPositions[i], satPositions[j]);
-            if (dKm > kMaxIslDistanceKm) continue;
 
-            double latenecyMs = (dKm / kSpeedOfLightKmPerSec) * 1000.0;
+            if (dKm <= kMaxIslDistanceKm) {
+                candidates.push_back({
+                    dKm,
+                    static_cast<int>(j)
+                });
+            }
+        }
 
-            Link link;
-            link.fromNodeId = static_cast<int>(i);  // node IDs match order above
-            link.toNodeId   = static_cast<int>(j);
-            link.latencyMs = latenecyMs;
-            link.capacityMbps = kDefaultCapacityMbps;
-            link.lossProb = kDefaultLossProb;
-            topo.links.push_back(link);
+        std::sort(
+            candidates.begin(),
+            candidates.end(),
+            [](const auto& a, const auto& b) {
+                return a.first < b.first;
+            }
+        );
 
-            // Add reverse link (undirected graph)
-            Link linkBack = link;
-            linkBack.fromNodeId = link.toNodeId;
-            linkBack.toNodeId   = link.fromNodeId;
-            topo.links.push_back(linkBack);
+        int linksToAdd = std::min(
+            kMaxSatelliteNeighbors,
+            static_cast<int>(candidates.size())
+        );
 
+        for (int k = 0; k < linksToAdd; ++k) {
+            double dKm = candidates[k].first;
+            int neighborNodeId = candidates[k].second;
+            int currentNodeId = static_cast<int>(i);
+
+            topo.links.push_back(
+                makeLink(currentNodeId, neighborNodeId, dKm)
+            );
         }
     }
 
-    // Ground <-> Satellite links
+    // Ground ↔ satellite links.
     for (std::size_t gi = 0; gi < gsPositions.size(); ++gi) {
         const auto& gsPos = gsPositions[gi];
         int gsNodeId = firstGroundNodeId + static_cast<int>(gi);
@@ -114,19 +149,9 @@ TopologySnapshot Simulator::snapshotAt(double tSeconds) const {
             }
 
             double dKm = distanceKm(satPos, gsPos);
-            double latencyMs = (dKm / kSpeedOfLightKmPerSec) * 1000.0;
 
-            Link link;
-            link.fromNodeId = gsNodeId;
-            link.toNodeId   = satNodeId;
-            link.latencyMs = latencyMs;
-            link.capacityMbps = kDefaultLossProb;
-            topo.links.push_back(link);
-
-            Link linkBack = link;
-            linkBack.fromNodeId = satNodeId;
-            linkBack.toNodeId   = gsNodeId;
-            topo.links.push_back(linkBack);
+            topo.links.push_back(makeLink(gsNodeId, satNodeId, dKm));
+            topo.links.push_back(makeLink(satNodeId, gsNodeId, dKm));
         }
     }
 
