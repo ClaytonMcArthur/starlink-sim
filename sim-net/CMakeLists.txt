@@ -4,6 +4,7 @@ add_library(sim-net
     route_utils.cpp
     packet.cpp
     link_emulator.cpp
+    flow_simulator.cpp
 )
 
 target_include_directories(sim-net

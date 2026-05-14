@@ -10,6 +10,10 @@ add_executable(run_packet_sim
     run_packet_sim.cpp
 )
 
+add_executable(run_flow_sim
+    run_flow_sim.cpp
+)
+
 target_link_libraries(run_small_sim
     PRIVATE
         sim-core
@@ -28,6 +32,13 @@ target_link_libraries(run_packet_sim
         sim-net
 )
 
+target_link_libraries(run_flow_sim
+    PRIVATE
+        sim-core
+        sim-net
+)
+
 target_compile_features(run_small_sim PUBLIC cxx_std_20)
 target_compile_features(run_routing_experiment PUBLIC cxx_std_20)
 target_compile_features(run_packet_sim PUBLIC cxx_std_20)
+target_compile_features(run_flow_sim PUBLIC cxx_std_20)

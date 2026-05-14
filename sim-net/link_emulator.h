@@ -1,9 +1,7 @@
-//sim-net/link_emulator.h
-
 #pragma once
 
 #include <cstdint>
-#include <optional>
+#include <random>
 #include <vector>
 
 #include "packet.h"
@@ -22,15 +20,15 @@ struct PacketDeliveryResult {
 };
 
 class LinkEmulator {
-    public:
-        explicit LinkEmulator(std::uint32_t randomSeed = 42);
+public:
+    explicit LinkEmulator(std::uint32_t randomSeed = 42);
 
-        PacketDeliveryResult sendPacketAlongRoute(
-            const Packet& packet,
-            const std::vector<int>& route,
-            const TopologySnapshot& topo
-        );
+    PacketDeliveryResult sendPacketAlongRoute(
+        const Packet& packet,
+        const std::vector<int>& route,
+        const TopologySnapshot& topo
+    );
 
-    private:
-        std::uint32_t randomSeed_;
+private:
+    std::mt19937 rng_;
 };
